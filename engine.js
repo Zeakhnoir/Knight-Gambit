@@ -1,35 +1,25 @@
 // =============================================================
-// KNIGHT SLOT — game engine (pure logic, no DOM)
+// KNIGHT SLOT — game engine
 // =============================================================
-// Rules summary:
-// - 8x8 board, knight starts at bottom-right (row 7, col 7).
-// - Each spin: roll N (1..10) base jumps for the primary horse.
-// - Knight makes N L-shaped jumps, uniformly random among legal moves.
-//   If no legal moves exist, allow revisit (in practice every square has >=2 moves).
-// - Tile contents are randomized fresh and SHOWN before the spin.
-// - Tiles stay active (can retrigger).
-// - Tile types: EMPTY, PAYOUT (multiplier), JUMPS (+k), EXTRA_HORSE.
-// - EXTRA_HORSE: spawns a second horse from top-left (0,0) that jumps N times.
-//   Extra horses can themselves trigger further extra horses. Capped at depth=5.
-// - Bet = 1 unit. Win = sum of all payout multipliers landed on.
+// Edit TILE_CONFIG below to tune RTP / volatility.
 // =============================================================
 
-export const KNIGHT_MOVES = [
+const KNIGHT_MOVES = [
   [-2, -1], [-2, 1], [-1, -2], [-1, 2],
   [1, -2], [1, 2], [2, -1], [2, 1]
 ];
 
-export const BOARD_SIZE = 8;
-export const START_R = 7;
-export const START_C = 7;
-export const EXTRA_HORSE_START_R = 0;
-export const EXTRA_HORSE_START_C = 0;
-export const MAX_EXTRA_HORSE_DEPTH = 5;
+const BOARD_SIZE = 8;
+const START_R = 7;
+const START_C = 7;
+const EXTRA_HORSE_START_R = 0;
+const EXTRA_HORSE_START_C = 0;
+const MAX_EXTRA_HORSE_DEPTH = 5;
 
-// ---------- TILE WEIGHT CONFIG ----------
-// Adjust these freely to tune RTP / volatility.
-export const TILE_CONFIG = {
-  empty: { weight: 10000 },
+// ===== TILE WEIGHTS — TUNE THESE =====
+// Higher weight = more common. They're relative, not percentages.
+const TILE_CONFIG = {
+  empty: { weight: 50 },
   payouts: [
     { mult: 0.1,   weight: 80 },
     { mult: 0.2,   weight: 60 },
@@ -59,12 +49,10 @@ export const TILE_CONFIG = {
   extraHorse: { weight: 1.5 }
 };
 
-// Distribution of base N (jumps per spin), uniform 1..10
-export function rollN(rng = Math.random) {
-  return 1 + Math.floor(rng() * 10);
+function rollN() {
+  return 1 + Math.floor(Math.random() * 10);
 }
 
-// Build a flat sampling table from TILE_CONFIG
 function buildDistribution() {
   const items = [];
   items.push({ kind: 'EMPTY', weight: TILE_CONFIG.empty.weight });
@@ -86,23 +74,23 @@ function buildDistribution() {
 
 const DIST = buildDistribution();
 
-export function sampleTile(rng = Math.random) {
-  const r = rng();
+function sampleTile() {
+  const r = Math.random();
   for (const it of DIST) if (r < it.cum) return { ...it };
   return { ...DIST[DIST.length - 1] };
 }
 
-export function buildBoard(rng = Math.random) {
+function buildBoard() {
   const board = [];
   for (let r = 0; r < BOARD_SIZE; r++) {
     const row = [];
-    for (let c = 0; c < BOARD_SIZE; c++) row.push(sampleTile(rng));
+    for (let c = 0; c < BOARD_SIZE; c++) row.push(sampleTile());
     board.push(row);
   }
   return board;
 }
 
-export function legalMoves(r, c) {
+function legalMoves(r, c) {
   const out = [];
   for (const [dr, dc] of KNIGHT_MOVES) {
     const nr = r + dr, nc = c + dc;
@@ -113,9 +101,7 @@ export function legalMoves(r, c) {
   return out;
 }
 
-// Run a single horse path. Records every step for animation.
-// Returns { path: [{r,c,tile,gainedJumps,triggeredHorse}], totalPayout, hatchedHorses }
-function runHorse(board, startR, startC, N, rng = Math.random) {
+function runHorse(board, startR, startC, N) {
   let r = startR, c = startC;
   const path = [];
   let jumps = N;
@@ -124,8 +110,7 @@ function runHorse(board, startR, startC, N, rng = Math.random) {
 
   while (jumps > 0) {
     const moves = legalMoves(r, c);
-    // Uniform random among legal moves. (All 64 squares always have >=2 legal moves.)
-    const [nr, nc] = moves[Math.floor(rng() * moves.length)];
+    const [nr, nc] = moves[Math.floor(Math.random() * moves.length)];
     r = nr; c = nc;
     jumps--;
 
@@ -151,51 +136,35 @@ function runHorse(board, startR, startC, N, rng = Math.random) {
   return { path, totalPayout, hatchedHorses };
 }
 
-// Full spin orchestration: primary horse + cascading extra horses.
-// Returns a structured result the UI can replay step by step.
-export function spin(rng = Math.random) {
-  const N = rollN(rng);
-  const board = buildBoard(rng);
+// Public API: run one full spin
+function spin() {
+  const N = rollN();
+  const board = buildBoard();
 
   const horses = [];
-  // Primary horse
-  const primary = runHorse(board, START_R, START_C, N, rng);
-  horses.push({
-    origin: 'PRIMARY',
-    startR: START_R,
-    startC: START_C,
-    baseJumps: N,
-    ...primary
-  });
+  const primary = runHorse(board, START_R, START_C, N);
+  horses.push({ origin: 'PRIMARY', startR: START_R, startC: START_C, baseJumps: N, ...primary });
 
-  // Cascade: each triggered HORSE tile spawns a new horse from top-left, jumping N times.
   let pending = primary.hatchedHorses;
   let depth = 0;
   while (pending > 0 && depth < MAX_EXTRA_HORSE_DEPTH) {
-    let nextPending = 0;
+    let next = 0;
     for (let i = 0; i < pending; i++) {
-      const extra = runHorse(board, EXTRA_HORSE_START_R, EXTRA_HORSE_START_C, N, rng);
+      const extra = runHorse(board, EXTRA_HORSE_START_R, EXTRA_HORSE_START_C, N);
       horses.push({
-        origin: 'EXTRA',
-        depth: depth + 1,
-        startR: EXTRA_HORSE_START_R,
-        startC: EXTRA_HORSE_START_C,
-        baseJumps: N,
-        ...extra
+        origin: 'EXTRA', depth: depth + 1,
+        startR: EXTRA_HORSE_START_R, startC: EXTRA_HORSE_START_C,
+        baseJumps: N, ...extra
       });
-      nextPending += extra.hatchedHorses;
+      next += extra.hatchedHorses;
     }
-    pending = nextPending;
+    pending = next;
     depth++;
   }
 
   const totalWin = horses.reduce((s, h) => s + h.totalPayout, 0);
-
-  return {
-    bet: 1,
-    baseN: N,
-    board,
-    horses,
-    totalWin
-  };
+  return { bet: 1, baseN: N, board, horses, totalWin };
 }
+
+// Expose globally so non-module script can use it
+window.KnightEngine = { spin, BOARD_SIZE, START_R, START_C };
