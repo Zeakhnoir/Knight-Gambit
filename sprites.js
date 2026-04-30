@@ -1,47 +1,49 @@
 // Pixel art assets for Knight Slot.
-// Each sprite is a 16x16 pixel grid expressed as a string array; '.' = transparent.
+// Each sprite is a pixel grid expressed as a string array; '.' = transparent.
 // Rendered as inline SVG with shape-rendering: crispEdges for sharp pixels.
 //
 // Color codes:
 //   '.' = transparent
 //   'a' = dark outline
 //   'b' = main body (light)
-//   'c' = mid shadow
+//   'c' = mid shadow (mane / neck)
 //   'd' = deep shadow
-//   'e' = eye / nostril (dark)
-//   'f' = highlight / mane crown
-//   'g' = base pedestal mid
+//   'e' = eye
+//   'g' = pedestal base
 
-// Chess knight — head facing LEFT (snout pointing left), ear top-right,
-// mane shadow defining the back of the neck, wide pedestal base.
-// 16x16 silhouette designed to read as a chess piece even at small sizes.
+// Chess knight — 28x20 horizontal silhouette.
+// Head facing LEFT (snout pointing left), pointed ear up-back,
+// mane shadow on the back of the neck, classic Staunton pedestal.
 export const KNIGHT_SPRITE = [
-  '................',
-  '.........aa.....',
-  '........abba....',
-  '.......abbbba...',
-  '......abbbbbba..',
-  '.....abbbbbcba..',
-  '...aabbbbbccba..',
-  '..abbbbbbbccba..',
-  '.abbcebbbbcba...',
-  '.abbbbbbbbcba...',
-  '..aabbbbbbcba...',
-  '....abbbbcba....',
-  '....abbbbcba....',
-  '...abbbbbbbba...',
-  '..abgggggggggba.',
-  '.aaaaaaaaaaaaaa.'
+  '............................',
+  '............................',
+  '...............aaa..........',
+  '..............abbba.........',
+  '...........aaabbbbba........',
+  '..........abbbbbbbbba.......',
+  '.........abbbbbbbbbbba......',
+  '........abbbbbbbbbbbcba.....',
+  '.......abbbbebbbbbbbccba....',
+  '......abbbbbbbbbbbbbccba....',
+  '.....abbbbbbbbbbbbbbccba....',
+  '....abbbbaabbbbbbbbbccba....',
+  '....abaaa..abbbbbbbbccba....',
+  '....aa......abbbbbbbccba....',
+  '............abbbbbbbccba....',
+  '............abbbbbbbbcba....',
+  '............abbbbbbbbbba....',
+  '...........abbbbbbbbbbbba...',
+  '..........aggggggggggggga...',
+  '..........aaaaaaaaaaaaaaa...'
 ];
 
 // Color palette for white/cream knight (primary horse)
 export const KNIGHT_PALETTE_LIGHT = {
   a: '#1a0508',  // outline
   b: '#f4ecd8',  // light cream body
-  c: '#c9b890',  // shadow
+  c: '#beac82',  // mane shadow
   d: '#8a7548',  // deep shadow
   e: '#1a0508',  // eye
-  f: '#fff5dc',  // highlight
   g: '#7a5a30'   // pedestal
 };
 
@@ -49,10 +51,9 @@ export const KNIGHT_PALETTE_LIGHT = {
 export const KNIGHT_PALETTE_GOLD = {
   a: '#2a1408',
   b: '#f7d56b',
-  c: '#c89a30',
+  c: '#b8881e',
   d: '#7a5810',
   e: '#2a1408',
-  f: '#fff0a8',
   g: '#5a3a08'
 };
 
@@ -73,33 +74,6 @@ export function spriteToSVG(sprite, palette, size = 64, glow = false) {
     ? '<defs><filter id="glow"><feGaussianBlur stdDeviation="0.4"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>'
     : '';
   const g = glow ? '<g filter="url(#glow)">' : '<g>';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${filter}${g}${rects.join('')}</g></svg>`;
+  // viewBox preserves the sprite's aspect ratio inside a square `size` box.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges">${filter}${g}${rects.join('')}</g></svg>`;
 }
-
-// Special "extra horse" symbol icon (smaller, decorative, used inside a tile)
-export const HORSE_SYMBOL_SPRITE = [
-  '................',
-  '.......aaaa.....',
-  '......aabbaa....',
-  '.....abbbbba....',
-  '....abccccba....',
-  '....abcddcba....',
-  '...abcdddccba...',
-  '...abdddddcba...',
-  '...abddeedcba...',
-  '....abeeebba....',
-  '.....abbbba.....',
-  '....abbbbbba....',
-  '...abbabbabba...',
-  '..aabaaaaaabaa..',
-  '................',
-  '................'
-];
-
-export const HORSE_SYMBOL_PALETTE = {
-  a: '#1a0a00',
-  b: '#ffd84d',
-  c: '#ffe680',
-  d: '#fff0a8',
-  e: '#1a0a00'
-};
