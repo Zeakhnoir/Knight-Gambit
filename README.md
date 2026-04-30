@@ -1,57 +1,120 @@
 # Knight's Gambit — Slot Game
 
-8×8 chess board slot game. The knight jumps L-shape moves. Tiles can pay multipliers, give extra jumps, or spawn a second golden knight.
+An 8×8 chess-board slot game. The knight starts at the bottom-right corner and makes 1–10 L-shaped jumps each spin. Tiles can pay multipliers, give extra jumps, or spawn a second golden knight from the top-left corner.
 
-## How to run
+## Quick start
 
-**Just double-click `index.html`** — opens in your browser. No install, no commands, no server.
+```bash
+npm install
+npm start
+# open http://localhost:3000
+```
 
-That's it.
+That's it. Single Node.js process serves both the API and the frontend.
 
 ## File structure
 
 ```
 knight-slot/
-├── index.html          ← double-click to play
-├── README.md
-├── assets/
-│   ├── knight-cream.png   ← primary horse pixel art
-│   └── knight-gold.png    ← extra-horse pixel art (gold)
-└── src/
-    ├── engine.js          ← game logic (edit weights here)
-    ├── app.js             ← UI / animation
-    └── styles.css         ← visuals
+├── package.json           # express + cors deps
+├── server.js              # Node backend, exposes /api/spin
+└── public/                # frontend, served as static files
+    ├── index.html         # React app (loaded via CDN, no build step)
+    ├── engine.js          # game logic — used by BOTH backend and browser
+    └── sprites.js         # pixel art knight + palettes
 ```
 
-## Tuning the game
+## How the game works
 
-All weights are in **`src/engine.js`** — look for `TILE_CONFIG` near the top.
+| Element            | Behavior                                                         |
+| ------------------ | ---------------------------------------------------------------- |
+| Board              | 8×8, dark red ("black") + cream ("white") tiles                  |
+| Knight start       | Bottom-right corner (row 7, col 7)                               |
+| Base jumps `N`     | Rolled uniformly 1–10 at the start of each spin                  |
+| Movement           | Standard chess L-move, **uniformly random** among legal moves    |
+| Tile contents      | Re-randomized & **shown** before the spin starts                 |
+| Tile retrigger     | Tiles stay active — knight can land on the same tile twice       |
+| Stuck state        | Doesn't happen on 8×8 (every square has ≥2 legal moves)          |
+| Extra-horse symbol | Spawns a 2nd knight from top-left (0,0); jumps the same `N` times|
+| Recursion cap      | Extra-horse cascade stops after depth 5                          |
+| Bet                | 1 unit per spin                                                  |
+
+## Tile types & current weights
+
+Edit `public/engine.js`, the `TILE_CONFIG` object. Higher weight = more common.
+
+| Type           | Values                                                 |
+| -------------- | ------------------------------------------------------ |
+| `EMPTY`        | Pays nothing                                           |
+| `PAYOUT`       | 0.1× / 0.2× / 0.4× / 0.6× / 0.8× / 1× / 2× / 5× / 10× / 20× / 50× / 100× |
+| `JUMPS`        | +1 to +10 extra jumps                                  |
+| `EXTRA_HORSE`  | Spawns the second knight                               |
+
+## Tuning RTP
+
+Run a Monte Carlo simulation. Quick recipe:
 
 ```js
-const TILE_CONFIG = {
-  empty: { weight: 50 },
-  payouts: [
-    { mult: 0.1, weight: 80 },
-    ...
-  ],
-  ...
-};
+// sim.js — drop in project root
+import { spin } from './public/engine.js';
+
+const SPINS = 500_000;
+let total = 0;
+for (let i = 0; i < SPINS; i++) total += spin().totalWin;
+console.log('RTP:', (total / SPINS * 100).toFixed(2) + '%');
 ```
 
-After editing, just **refresh the browser** (Ctrl+R / Cmd+R). No restart needed since there's no server.
+Run with `node sim.js`. Tweak weights in `engine.js`, re-run, repeat until you hit your target.
 
-## Tweaking visuals
+**Drivers of RTP:**
+- Higher weight on big payouts (10×+) → higher RTP and higher volatility
+- Higher weight on `JUMPS` tiles → MASSIVE RTP increase (extra landings = compounding)
+- Higher weight on `EXTRA_HORSE` → big variance, harder to control
+- Higher weight on `EMPTY` → lower RTP, lower volatility
 
-- **Tile colors** (red/white): edit CSS variables `--board-dark` and `--board-light` in `src/styles.css`.
-- **Animation speed**: edit `ANIMATION_MS` at the top of `src/app.js` (lower = faster).
-- **Knight art**: replace `assets/knight-cream.png` and `assets/knight-gold.png` with your own pixel art (any size; image will be scaled to the tile via CSS `image-rendering: pixelated`).
+## API
 
-## Game rules
+### `POST /api/spin`
 
-- 8×8 board, knight starts bottom-right
-- Each spin: roll N (1–10) base jumps
-- Knight moves L-shape, uniformly random among legal moves
-- Tile contents re-randomized and shown each spin
-- Tiles stay active (can retrigger)
-- Extra-horse tile: spawns 2nd horse (gold) from top-left, jumps N times
-- Bet 1 per spin
+No request body. Returns:
+
+```json
+{
+  "bet": 1,
+  "baseN": 7,
+  "board": [[{"kind":"PAYOUT","mult":0.4}, ...], ...],
+  "horses": [
+    {
+      "origin": "PRIMARY",
+      "startR": 7, "startC": 7,
+      "baseJumps": 7,
+      "path": [
+        {"r":5,"c":6,"tile":{"kind":"PAYOUT","mult":0.4},"payout":0.4,"gainedJumps":0,"triggeredHorse":false,"jumpsRemaining":6},
+        ...
+      ],
+      "totalPayout": 1.2,
+      "hatchedHorses": 0
+    }
+  ],
+  "totalWin": 1.2
+}
+```
+
+The frontend replays the `path` array tile-by-tile with ~310ms animation per jump.
+
+### `GET /api/health` — liveness check
+
+## Production notes
+
+- The frontend currently has a fallback to client-side spin if `/api/spin` is unreachable. **Remove that fallback for real money play** — spin results MUST come from the server.
+- Add session/auth, balance persistence, and audit logging before going live.
+- The current animation (~310ms/hop) means a 10-jump spin takes ~3s. Adjustable in `index.html` (`sleep(310)` line).
+- Knight sprite is a 16×16 pixel art SVG generated at runtime (`sprites.js`). To swap in real pixel art PNG/sprite-sheets, replace `KNIGHT_SPRITE` data with image URLs and adjust `Knight` component.
+
+## Customizing visuals
+
+- **Tile colors:** CSS variables `--board-dark`, `--board-light` in `index.html` `<style>`.
+- **Gold/red theme:** `--gold`, `--accent`.
+- **Knight palette:** `KNIGHT_PALETTE_LIGHT` (primary, cream/white) and `KNIGHT_PALETTE_GOLD` (extra horse) in `sprites.js`.
+- **Animation speed:** `await sleep(310)` line in `handleSpin()` in `index.html`.
+# Knight-Gambit
