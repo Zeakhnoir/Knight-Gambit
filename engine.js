@@ -29,7 +29,7 @@ export const MAX_EXTRA_HORSE_DEPTH = 5;
 // ---------- TILE WEIGHT CONFIG ----------
 // Adjust these freely to tune RTP / volatility.
 export const TILE_CONFIG = {
-  empty: { weight: 200 },
+  empty: { weight: 400 },
   payouts: [
     { mult: 0.1,   weight: 80 },
     { mult: 0.2,   weight: 60 },
@@ -42,7 +42,7 @@ export const TILE_CONFIG = {
     { mult: 10.0,  weight: 1.2 },
     { mult: 20.0,  weight: 0.4 },
     { mult: 50.0,  weight: 0.12 },
-    { mult: 100.0, weight: 0.03 }
+    { mult: 100.0, weight: 2 }
   ],
   extraJumps: [
     { jumps: 1,  weight: 14 },
