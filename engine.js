@@ -19,7 +19,7 @@ const MAX_EXTRA_HORSE_DEPTH = 5;
 // ===== TILE WEIGHTS — TUNE THESE =====
 // Higher weight = more common. They're relative, not percentages.
 const TILE_CONFIG = {
-  empty: { weight: 50 },
+  empty: { weight: 200 },
   payouts: [
     { mult: 0.1,   weight: 80 },
     { mult: 0.2,   weight: 60 },
